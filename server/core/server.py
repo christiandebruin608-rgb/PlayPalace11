@@ -4424,7 +4424,11 @@ async def run_server(
     db_path = _ensure_var_server_dir() / "playpalace.db"
 
     if _ensure_config_file(config_path, example_path):
-        return
+        if os.environ.get("PP_ALLOW_INSECURE_WS", "").strip().lower() not in ("1", "true", "yes"):
+            return
+        print(
+            "PP_ALLOW_INSECURE_WS is set; continuing startup with the generated configuration."
+        )
 
     db_created, needs_owner = _inspect_database(db_path)
     if needs_owner:
