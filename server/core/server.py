@@ -1361,6 +1361,25 @@ class Server(AdministrationMixin, DocumentBrowsingMixin, TranscriberRoleMixin):
                     return
 
                 # User not found - check if this will be a new user that needs approval
+                if os.environ.get("PP_REQUIRE_EXPLICIT_REGISTER", "").strip().lower() in ("1", "true", "yes"):
+                    # Explicit registration required: logins never auto-create accounts.
+                    self._record_login_failure(username)
+                    error_message = Localization.get(locale, "incorrect-username")
+                    await client.send({"type": "play_sound", "name": "accounterror.ogg"})
+                    await client.send(
+                        {"type": "speak", "text": error_message, "buffer": "activity"}
+                    )
+                    await client.send(
+                        {
+                            "type": "disconnect",
+                            "reconnect": False,
+                            "show_message": True,
+                            "return_to_login": True,
+                            "message": error_message,
+                        }
+                    )
+                    return
+
                 needs_approval = not self._auto_approve_new_accounts and self._db.get_user_count() > 0
                 # Try to register if accounts are not blocked
                 if self._block_new_accounts:

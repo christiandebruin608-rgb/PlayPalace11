@@ -104,7 +104,7 @@
       <dialog id="login-dialog">
         <form id="connect-form" method="dialog">
           <p><strong>Connect to PlayPalace</strong></p>
-          <p>Welcome to PlayPalace. Please log in, or choose a username and password below and an account will be created for you.</p>
+          <p>Welcome to PlayPalace. Log in with your username and password, or use Create new account to register a new one.</p>
           <p id="login-error" class="status error" hidden></p>
           <div style="display: grid; gap: 8px;">
             <label>
@@ -143,6 +143,7 @@
             </label>
           </div>
           <div class="row" style="justify-content: flex-end; margin-top: 10px;">
+            <button id="register-btn" type="button" class="secondary">Create new account</button>
             <button id="connect-btn" type="submit">Connect</button>
           </div>
         </form>
