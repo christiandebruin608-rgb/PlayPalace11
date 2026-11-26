@@ -196,6 +196,7 @@ const elements = {
   disconnectBtn: document.getElementById("disconnect-btn"),
   status: document.getElementById("status"),
   loginError: document.getElementById("login-error"),
+  registerBtn: document.getElementById("register-btn"),
   musicVolume: document.getElementById("music-volume"),
   musicVolumeValue: document.getElementById("music-volume-value"),
   ambienceVolume: document.getElementById("ambience-volume"),
@@ -1445,6 +1446,8 @@ async function bootstrap() {
           setStatus("Connected. Restoring session...");
         } else if (pendingAuthMethod === "refresh_token") {
           setStatus("Connected. Refreshing session...");
+        } else if (pendingAuthMethod === "register") {
+          setStatus("Connected. Creating account...");
         } else {
           setStatus("Connected. Authorizing...");
         }
@@ -1566,6 +1569,39 @@ async function bootstrap() {
         patch: 0,
         client_type: "Web",
         platform: getPlatformString(),
+      },
+    });
+  });
+
+  elements.registerBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    if (store.state.connection.status === "connecting") {
+      return;
+    }
+    clearLoginError();
+    const serverUrl = getDefaultServerUrl();
+    const username = normalizeUsername(elements.username.value);
+    const password = elements.password.value;
+
+    if (!username) {
+      setStatus("Username is required.", true);
+      return;
+    }
+    if (!password) {
+      setStatus("Password is required.", true);
+      return;
+    }
+
+    elements.username.value = username;
+    elements.loginDialog.returnValue = "register";
+    store.setConnection({ serverUrl, username, status: "connecting", authenticated: false });
+    pendingAuthMethod = "register";
+    network.connect({
+      serverUrl,
+      authPacket: {
+        type: "register",
+        username,
+        password,
       },
     });
   });
