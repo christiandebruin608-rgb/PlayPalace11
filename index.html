@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PlayPalace connection test</title>
+<style>
+body { font-family: sans-serif; margin: 1.2rem; max-width: 40rem; }
+h1 { font-size: 1.3rem; }
+#status { font-weight: bold; }
+#log { font-family: monospace; white-space: pre-wrap; }
+button { font-size: 1.1rem; padding: .5rem 1rem; margin: .5rem 0; }
+</style>
+</head>
+<body>
+<h1>PlayPalace connection test</h1>
+<p role="status" id="status" aria-live="polite">Not connected yet.</p>
+<button id="connect">Connect</button>
+<h2>Messages from the server</h2>
+<p id="log" aria-live="polite"></p>
+<script>
+var url = "wss://playpalace.onrender.com/";
+var ws = null;
+var attempts = 0;
+var status = document.getElementById("status");
+var log = document.getElementById("log");
+function say(line) {
+  log.textContent = log.textContent + line + "\n";
+}
+function setStatus(t) { status.textContent = t; }
+function connect() {
+  attempts = attempts + 1;
+  setStatus("Connecting (try " + attempts + ")...");
+  try { ws = new WebSocket(url); }
+  catch (e) { setStatus("Could not start the connection: " + e.message); return; }
+  ws.onopen = function () {
+    attempts = 0;
+    setStatus("CONNECTED. The server answered.");
+    say("Handshake with the server succeeded.");
+  };
+  ws.onmessage = function (ev) {
+    say("Server: " + ev.data);
+  };
+  ws.onclose = function (ev) {
+    setStatus("Disconnected (code " + ev.code + ").");
+    if (ev.code !== 1000 && attempts < 4) {
+      say("Retrying in 10 seconds. First try can fail while the server wakes up.");
+      setStatus("Server may be waking up. Retrying in 10 seconds (try " + (attempts + 1) + ")...");
+      setTimeout(connect, 10000);
+    } else {
+      say("Not retrying. Press Connect to try again.");
+    }
+  };
+  ws.onerror = function () {
+    say("Connection error.");
+  };
+}
+document.getElementById("connect").addEventListener("click", function () {
+  attempts = 0;
+  connect();
+});
+window.addEventListener("load", function () { connect(); });
+</script>
+</body>
+</html>
