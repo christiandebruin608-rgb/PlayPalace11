@@ -1,4 +1,6 @@
 %{!?_unitdir: %define _unitdir /usr/lib/systemd/system}
+%global debug_package %{nil}
+
 
 Name:           playpalace-server
 Version:        0.0.0

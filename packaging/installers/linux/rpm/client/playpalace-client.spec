@@ -1,4 +1,6 @@
 Name:           playpalace-client
+%global debug_package %{nil}
+
 Version:        0.0.0
 Release:        1%{?dist}
 Summary:        PlayPalace desktop client
