@@ -2,6 +2,7 @@
 
 import sqlite3
 import sys
+import os
 import json
 from pathlib import Path
 from dataclasses import dataclass, field
@@ -93,6 +94,103 @@ def _token_from_row(row: sqlite3.Row) -> RefreshTokenRecord:
     )
 
 
+
+class _TursoRow:
+    """Row wrapper for remote connections: access by column name or index."""
+
+    __slots__ = ("_values", "_columns")
+
+    def __init__(self, values, columns):
+        self._values = tuple(values)
+        self._columns = tuple(col[0] for col in (columns or ()))
+
+    def __getitem__(self, key):
+        if isinstance(key, str):
+            if key not in self._columns:
+                raise KeyError(key)
+            return self._values[self._columns.index(key)]
+        return self._values[key]
+
+    def keys(self):
+        return list(self._columns)
+
+    def __len__(self):
+        return len(self._values)
+
+    def __iter__(self):
+        return iter(self._values)
+
+
+class _TursoCursor:
+    """Cursor wrapper for remote connections that returns _TursoRow rows."""
+
+    def __init__(self, raw):
+        self._raw = raw
+
+    def execute(self, sql, parameters=()):
+        self._raw.execute(sql, parameters)
+        return self
+
+    def executemany(self, sql, seq_of_parameters=()):
+        self._raw.executemany(sql, seq_of_parameters)
+        return self
+
+    def _wrap(self, row):
+        if row is None:
+            return None
+        return _TursoRow(row, self._raw.description or ())
+
+    def fetchone(self):
+        return self._wrap(self._raw.fetchone())
+
+    def fetchall(self):
+        return [self._wrap(row) for row in self._raw.fetchall()]
+
+    def fetchmany(self, size=1):
+        return [self._wrap(row) for row in self._raw.fetchmany(size)]
+
+    @property
+    def lastrowid(self):
+        return self._raw.lastrowid
+
+    @property
+    def rowcount(self):
+        return self._raw.rowcount
+
+    @property
+    def description(self):
+        return self._raw.description
+
+    def close(self):
+        self._raw.close()
+
+
+class _TursoConnection:
+    """Connection wrapper for remote libSQL (Turso) connections."""
+
+    def __init__(self, raw):
+        self._raw = raw
+
+    def cursor(self):
+        return _TursoCursor(self._raw.cursor())
+
+    def execute(self, sql, parameters=()):
+        return self.cursor().execute(sql, parameters)
+
+    def commit(self):
+        self._raw.commit()
+
+    def rollback(self):
+        self._raw.rollback()
+
+    def close(self):
+        self._raw.close()
+
+    @property
+    def in_transaction(self):
+        return self._raw.in_transaction
+
+
 class Database:
     """SQLite database for PlayPalace persistence.
 
@@ -103,6 +201,7 @@ class Database:
         """Initialize the database wrapper with a path."""
         self.db_path = Path(db_path)
         self._conn: sqlite3.Connection | None = None
+        self._remote = False
 
     def _get_conn(self) -> sqlite3.Connection:
         """Return the active connection or raise if not connected."""
@@ -111,7 +210,22 @@ class Database:
         return self._conn
 
     def connect(self) -> None:
-        """Connect to the database and create tables if needed."""
+        """Connect to the database and create tables if needed.
+
+        When TURSO_DATABASE_URL is set, connect to the remote libSQL (Turso)
+        database instead of the local file. TURSO_AUTH_TOKEN holds the access
+        token for that remote database.
+        """
+        turso_url = os.environ.get("TURSO_DATABASE_URL", "").strip()
+        turso_token = os.environ.get("TURSO_AUTH_TOKEN", "").strip()
+        if turso_url:
+            self._connect_turso(turso_url, turso_token)
+        else:
+            self._connect_local()
+        self._create_tables()
+
+    def _connect_local(self) -> None:
+        """Connect to the local SQLite file."""
         try:
             self._conn = sqlite3.connect(str(self.db_path))
         except sqlite3.Error as exc:
@@ -122,7 +236,38 @@ class Database:
             raise SystemExit(1) from exc
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
-        self._create_tables()
+        self._remote = False
+
+    def _connect_turso(self, url: str, token: str) -> None:
+        """Connect to the remote Turso (libSQL) database."""
+        try:
+            import libsql_experimental as libsql
+        except ImportError as exc:
+            print(
+                "ERROR: TURSO_DATABASE_URL is set but the libsql driver is not "
+                "installed. Install it with: pip install libsql-experimental",
+                file=sys.stderr,
+            )
+            raise SystemExit(1) from exc
+        try:
+            raw = (
+                libsql.connect(url, auth_token=token)
+                if token
+                else libsql.connect(url)
+            )
+            self._conn = _TursoConnection(raw)
+        except Exception as exc:
+            print(
+                f"ERROR: Failed to connect to remote database '{url}': {exc}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1) from exc
+        self._remote = True
+        try:
+            self._conn.execute("PRAGMA foreign_keys = ON")
+        except Exception:
+            # Remote servers may ignore some local PRAGMA settings.
+            pass
 
     def close(self) -> None:
         """Close the database connection."""

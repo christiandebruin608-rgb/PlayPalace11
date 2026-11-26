@@ -4554,6 +4554,20 @@ def _ensure_config_file(config_path: Path, example_path: Path) -> bool:
 
 def _inspect_database(db_path: Path) -> tuple[bool, bool]:
     """Check if the database exists and whether an owner is required."""
+    if os.environ.get("TURSO_DATABASE_URL", "").strip():
+        try:
+            database = Database(str(db_path))
+            database.connect()
+            user_count = database.get_user_count()
+            owner = database.get_server_owner()
+            database.close()
+            return False, user_count == 0 or owner is None
+        except SystemExit:
+            raise
+        except Exception as exc:
+            print(f"ERROR: Failed to open remote database: {exc}", file=sys.stderr)
+            raise SystemExit(1) from exc
+
     if not db_path.exists():
         return True, True
 
