@@ -14,7 +14,7 @@ button { font-size: 1.1rem; padding: .5rem 1rem; margin: .5rem 0; }
 </head>
 <body>
 <h1>PlayPalace connection test</h1>
-<p role="status" id="status" aria-live="polite">Not connected yet.</p>
+<p role="status" id="status" aria-live="polite">Loading test, connecting to the server...</p>
 <button id="connect">Connect</button>
 <h2>Messages from the server</h2>
 <p id="log" aria-live="polite"></p>
@@ -27,7 +27,7 @@ var log = document.getElementById("log");
 function say(line) {
   log.textContent = log.textContent + line + "\n";
 }
-function setStatus(t) { status.textContent = t; }
+function setStatus(t) { status.textContent = t; say("STATUS: " + t); }
 function connect() {
   attempts = attempts + 1;
   setStatus("Connecting (try " + attempts + ")...");
