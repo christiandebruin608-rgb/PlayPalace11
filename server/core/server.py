@@ -403,6 +403,10 @@ class Server(AdministrationMixin, DocumentBrowsingMixin, TranscriberRoleMixin):
                 net_cfg.get("allow_insecure_ws"), self._allow_insecure_ws
             )
 
+        env_insecure = os.environ.get("PP_ALLOW_INSECURE_WS", "").strip().lower()
+        if env_insecure in ("1", "true", "yes", "on"):
+            self._allow_insecure_ws = True
+
         rate_cfg = auth_cfg.get("rate_limits") if isinstance(auth_cfg, dict) else None
         if isinstance(rate_cfg, dict):
             self._login_ip_limit = _read_limit(
@@ -4550,6 +4554,22 @@ def _ensure_server_owner(db_path: Path, config_path: Path, db_created: bool) -> 
         print(f"Creating database at '{db_path}'.")
     else:
         print("No server owner found in the database. Creating one now.")
+
+    env_user = os.environ.get("PP_OWNER_USERNAME", "").strip()
+    env_pass = os.environ.get("PP_OWNER_PASSWORD", "")
+    if env_user and env_pass:
+        try:
+            bootstrap_owner(
+                db_path=str(db_path),
+                username=env_user,
+                password=env_pass,
+                quiet=True,
+            )
+            print(f"Created server owner '{env_user}' (from PP_OWNER_USERNAME).")
+        except RuntimeError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            raise SystemExit(1) from exc
+        return
 
     if not sys.stdin.isatty():
         print(

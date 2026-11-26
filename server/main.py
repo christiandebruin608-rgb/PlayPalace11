@@ -67,6 +67,12 @@ Examples:
 
     args = parser.parse_args()
 
+    # Hosting platforms (Render and friends) assign the port via $PORT
+    if args.port is None:
+        env_port = os.environ.get("PORT", "").strip()
+        if env_port.isdigit():
+            args.port = int(env_port)
+
     # Validate SSL arguments (CLI-supplied; config-supplied is validated inside run_server)
     if (args.ssl_cert and not args.ssl_key) or (args.ssl_key and not args.ssl_cert):
         parser.error("Both --ssl-cert and --ssl-key must be provided together")
