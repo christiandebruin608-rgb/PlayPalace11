@@ -1,65 +1,201 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PlayPalace connection test</title>
-<style>
-body { font-family: sans-serif; margin: 1.2rem; max-width: 40rem; }
-h1 { font-size: 1.3rem; }
-#status { font-weight: bold; }
-#log { font-family: monospace; white-space: pre-wrap; }
-button { font-size: 1.1rem; padding: .5rem 1rem; margin: .5rem 0; }
-</style>
-</head>
-<body>
-<h1>PlayPalace connection test</h1>
-<p role="status" id="status" aria-live="polite">Loading test, connecting to the server...</p>
-<button id="connect">Connect</button>
-<h2>Messages from the server</h2>
-<p id="log" aria-live="polite"></p>
-<script>
-var url = "wss://playpalace.onrender.com/";
-var ws = null;
-var attempts = 0;
-var status = document.getElementById("status");
-var log = document.getElementById("log");
-function say(line) {
-  log.textContent = log.textContent + line + "\n";
-}
-function setStatus(t) { status.textContent = t; say("STATUS: " + t); }
-function connect() {
-  attempts = attempts + 1;
-  setStatus("Connecting (try " + attempts + ")...");
-  try { ws = new WebSocket(url); }
-  catch (e) { setStatus("Could not start the connection: " + e.message); return; }
-  ws.onopen = function () {
-    attempts = 0;
-    setStatus("CONNECTED. The server answered.");
-    say("Handshake with the server succeeded.");
-  };
-  ws.onmessage = function (ev) {
-    say("Server: " + ev.data);
-  };
-  ws.onclose = function (ev) {
-    setStatus("Disconnected (code " + ev.code + ").");
-    if (ev.code !== 1000 && attempts < 4) {
-      say("Retrying in 10 seconds. First try can fail while the server wakes up.");
-      setStatus("Server may be waking up. Retrying in 10 seconds (try " + (attempts + 1) + ")...");
-      setTimeout(connect, 10000);
-    } else {
-      say("Not retrying. Press Connect to try again.");
-    }
-  };
-  ws.onerror = function () {
-    say("Connection error.");
-  };
-}
-document.getElementById("connect").addEventListener("click", function () {
-  attempts = 0;
-  connect();
-});
-window.addEventListener("load", function () { connect(); });
-</script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>PlayPalace Web Client</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main>
+      <h1>PlayPalace V11 Web</h1>
+
+      <section class="panel">
+        <div class="row">
+          <button id="open-login-btn" type="button" class="secondary" tabindex="-1">Login/Reconnect</button>
+          <button id="disconnect-btn" type="button" class="secondary" tabindex="-1">Disconnect</button>
+          <span id="status" class="status" role="text">Disconnected</span>
+        </div>
+        <div class="row volume-controls">
+          <label for="audio-mute">
+            Mute
+            <input id="audio-mute" type="checkbox" />
+          </label>
+          <label for="music-volume">
+            Music
+            <input id="music-volume" type="range" min="0" max="100" step="10" value="20" />
+            <span id="music-volume-value" class="status">20%</span>
+          </label>
+          <label for="ambience-volume">
+            Ambience
+            <input id="ambience-volume" type="range" min="0" max="100" step="10" value="100" />
+            <span id="ambience-volume-value" class="status">100%</span>
+          </label>
+        </div>
+      </section>
+
+      <section id="game-shell" class="grid" hidden>
+        <section class="panel">
+          <div class="row">
+            <h2>Game</h2>
+            <button id="actions-btn" class="secondary actions-btn" type="button" tabindex="-1">Actions</button>
+          </div>
+          <ul id="menu-list" class="menu-list" tabindex="0"></ul>
+          <section id="inline-input" class="panel" hidden style="margin-top: 8px;">
+            <p id="inline-input-prompt" style="margin: 0 0 6px 0;"></p>
+            <div class="row">
+              <input id="inline-input-value" type="text" style="flex: 1;" />
+              <button id="inline-input-submit" type="button" tabindex="-1">Submit</button>
+              <button id="inline-input-cancel" type="button" class="secondary" tabindex="-1">Cancel</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="panel">
+          <div class="history-header">
+            <h2><button id="history-toggle" class="history-toggle-title" type="button" tabindex="-1" aria-expanded="true">History</button></h2>
+          </div>
+          <div id="history-content">
+            <textarea id="history" class="history" readonly tabindex="0" aria-label="History"></textarea>
+            <div
+              id="history-log"
+              class="history-log"
+              tabindex="0"
+              aria-label="History"
+              hidden
+            ></div>
+          </div>
+
+          <h2 style="margin-top: 10px;">Chat</h2>
+          <form id="chat-form" class="row" style="margin-top: 10px;">
+            <label>
+              Chat
+              <input id="chat-input" type="text" placeholder="Type message. Prefix with . for global." size="32" aria-label="Chat" />
+            </label>
+            <button type="submit" tabindex="-1">Send</button>
+          </form>
+        </section>
+      </section>
+
+      <dialog id="input-dialog">
+        <form method="dialog" id="input-dialog-form">
+          <p id="input-prompt"></p>
+          <input id="input-value" type="text" style="width: 100%;" />
+          <div class="row" style="justify-content: flex-end; margin-top: 10px;">
+            <button value="cancel" type="button" id="input-cancel" class="secondary">Cancel</button>
+            <button value="submit" type="submit" id="input-submit">Submit</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="document-editor-dialog" aria-label="Document Editor"></dialog>
+      <dialog id="markdown-viewer-dialog" aria-labelledby="markdown-viewer-prompt"></dialog>
+
+      <dialog id="actions-dialog">
+        <div id="actions-dialog-form">
+          <p><strong>Actions</strong></p>
+          <ul id="actions-list" class="actions-list"></ul>
+          <div class="row" style="justify-content: flex-end; margin-top: 10px;">
+            <button value="cancel" type="button" id="actions-cancel" class="secondary">Close</button>
+          </div>
+        </div>
+      </dialog>
+
+      <dialog id="login-dialog">
+        <form id="connect-form" method="dialog">
+          <p><strong>Connect to PlayPalace</strong></p>
+          <p>Welcome to PlayPalace. Please log in, or choose a username and password below and an account will be created for you.</p>
+          <p id="login-error" class="status error" hidden></p>
+          <div style="display: grid; gap: 8px;">
+            <label>
+              Username
+              <input
+                id="username"
+                type="text"
+                required
+                autocomplete="username"
+                autocapitalize="none"
+                autocorrect="off"
+                spellcheck="false"
+                enterkeyhint="next"
+              />
+            </label>
+            <label>
+              Password
+              <div class="row">
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  autocomplete="current-password"
+                  autocapitalize="none"
+                  autocorrect="off"
+                  spellcheck="false"
+                  enterkeyhint="go"
+                  style="flex: 1;"
+                />
+                <button id="toggle-password" type="button" class="secondary">Show password</button>
+              </div>
+            </label>
+            <label>
+              <input id="remember-me" type="checkbox" />
+              Remember username
+            </label>
+          </div>
+          <div class="row" style="justify-content: flex-end; margin-top: 10px;">
+            <button id="connect-btn" type="submit">Connect</button>
+          </div>
+        </form>
+      </dialog>
+
+      <div id="live-polite" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+      <div id="live-assertive" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
+
+      <footer class="panel footer">
+        <small id="app-version" role="text">Version</small>
+      </footer>
+    </main>
+
+    <script>
+      (() => {
+        const cacheBust = `cb=${Date.now()}`;
+
+        function loadScript(src, { type = "text/javascript", optional = false } = {}) {
+          return new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            if (type === "module") {
+              script.type = "module";
+            }
+            script.src = src;
+            script.onload = () => resolve();
+            script.onerror = () => {
+              if (optional) {
+                resolve();
+              } else {
+                reject(new Error(`Failed to load script: ${src}`));
+              }
+            };
+            document.body.appendChild(script);
+          });
+        }
+
+        (async () => {
+          await loadScript(`./version.js?${cacheBust}`, { optional: true });
+          await loadScript(`./config.sample.js?${cacheBust}`, { optional: true });
+          await loadScript(`./config.js?${cacheBust}`, { optional: true });
+          
+          await loadScript(`./libs/marked.min.js?${cacheBust}`, { optional: true });
+          await loadScript(`./libs/purify.min.js?${cacheBust}`, { optional: true });
+
+          const version = String(window.PLAYPALACE_WEB_VERSION || "2026.02.08.1").trim();
+          await loadScript(`./app.js?v=${encodeURIComponent(version)}&${cacheBust}`, {
+            type: "module",
+          });
+        })().catch((error) => {
+          // Keep failures visible for deployment debugging.
+          console.error(error);
+        });
+      })();
+    </script>
+  </body>
 </html>
