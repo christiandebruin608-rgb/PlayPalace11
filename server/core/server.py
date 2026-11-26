@@ -4575,12 +4575,12 @@ def _ensure_server_owner(db_path: Path, config_path: Path, db_created: bool) -> 
             raise SystemExit(1) from exc
         return
 
-        if env_user and not env_pass:
-            print(
-                "WARNING: PP_OWNER_USERNAME is set but PP_OWNER_PASSWORD is not; "
-                "skipping owner creation. Set PP_OWNER_PASSWORD and restart to create the owner."
-            )
-            return
+    if env_user and not env_pass:
+        print(
+            "WARNING: PP_OWNER_USERNAME is set but PP_OWNER_PASSWORD is not; "
+            "skipping owner creation. Set PP_OWNER_PASSWORD and restart to create the owner."
+        )
+        return
 
     if not sys.stdin.isatty():
         print(
